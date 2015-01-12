@@ -1,0 +1,31 @@
+---
+title: "UWDS2-Wk1-Albacore-jms206"
+author: "Jim Stearns, NetID=jms206"
+date: " 13 January 2015"
+output: 
+    pdf_document:
+        latex_engine: xelatex
+geometry: margin=0.25in
+fontsize: 12pt
+mainfont: Verdana
+monofont: Consolas
+---
+
+# Albalone Data
+
+We used summary statistics, histograms, and box plots to explore the Abalone data in class.  Now we’ll use aggregation to continue to explore that dataset. We know the height of each abalone, but we can more clearly identify some trends if we map the large number of unique heights to just a few height groups. We’ll also take a look at another kind of aggregation (averaging) to reveal a relationship between weight and age. Some of the solutions to this problem are contained in the slides we didn’t have time to cover in the first lecture. Please try them on your own first.
+
+### Deciles
+a.    Use the command “quantile” to find the deciles (10 groups) for height from the complete data set. Hint: you may find the command “seq” helpful.
+
+### Age vs Height Deciles
+b.	Use the command “cut” to assign each height value to the corresponding decile (e.g., the smallest values are assigned to the first decile and get mapped to the value, 1). Hint: use “as.numeric” to get integer values instead of ranges.
+c.	Now create a table of age vs. height decile. Examine the table and describe what you observe.
+
+### Average Weight as Function of Age
+
+d.	Another way to aggregate the data is averaging. Let’s compute the average whole weight of abalone as a function of age and plot the relationship.
+i.	Use the commands “unique” and “sort” to find the unique values of Age and store the values in ascending order to a variable named “ua”. 
+ii.	Use the command “sapply” to apply a function to each value in “ua”. The function should return the mean whole weight of all abalone of a given age. Hint: type “help(‘function’)” to find out more about user defined functions. The quotes inside the parentheses are important.
+iii.	Finally, use the “plot” command to plot mean weight vs. age. Describe the relationship revealed by the plot. Include an explanation for the behavior seen in the abalone of the 25-30 year age group.
+
