@@ -5,7 +5,7 @@ date: " 13 January 2015"
 output: 
     pdf_document:
         latex_engine: xelatex
-geometry: margin=0.25in
+geometry: margin=0.5in
 fontsize: 12pt
 mainfont: Verdana
 monofont: Consolas
@@ -13,19 +13,120 @@ monofont: Consolas
 
 # Albalone Data
 
-We used summary statistics, histograms, and box plots to explore the Abalone data in class.  Now we’ll use aggregation to continue to explore that dataset. We know the height of each abalone, but we can more clearly identify some trends if we map the large number of unique heights to just a few height groups. We’ll also take a look at another kind of aggregation (averaging) to reveal a relationship between weight and age. Some of the solutions to this problem are contained in the slides we didn’t have time to cover in the first lecture. Please try them on your own first.
+## Assignment Overview
 
-### Deciles
-a.    Use the command “quantile” to find the deciles (10 groups) for height from the complete data set. Hint: you may find the command “seq” helpful.
+"We used summary statistics, histograms, and box plots to explore the Abalone data in class.  Now we’ll use aggregation to continue to explore that dataset. We know the height of each abalone, but we can more clearly identify some trends if we map the large number of unique heights to just a few height groups. We’ll also take a look at another kind of aggregation (averaging) to reveal a relationship between weight and age. Some of the solutions to this problem are contained in the slides we didn’t have time to cover in the first lecture. Please try them on your own first."
 
-### Age vs Height Deciles
-b.	Use the command “cut” to assign each height value to the corresponding decile (e.g., the smallest values are assigned to the first decile and get mapped to the value, 1). Hint: use “as.numeric” to get integer values instead of ranges.
-c.	Now create a table of age vs. height decile. Examine the table and describe what you observe.
+## Dataset Acquisition and Preparation
 
-### Average Weight as Function of Age
+The Albalone dataset of interest can be found at the [University of California Irvine dataset repository](https://archive.ics.uci.edu/ml/datasets.html). Its [header page](https://archive.ics.uci.edu/ml/datasets/Abalone) states that there are 4177 instances/observations/rows and 8 attributes.
 
-d.	Another way to aggregate the data is averaging. Let’s compute the average whole weight of abalone as a function of age and plot the relationship.
-i.	Use the commands “unique” and “sort” to find the unique values of Age and store the values in ascending order to a variable named “ua”. 
-ii.	Use the command “sapply” to apply a function to each value in “ua”. The function should return the mean whole weight of all abalone of a given age. Hint: type “help(‘function’)” to find out more about user defined functions. The quotes inside the parentheses are important.
-iii.	Finally, use the “plot” command to plot mean weight vs. age. Describe the relationship revealed by the plot. Include an explanation for the behavior seen in the abalone of the 25-30 year age group.
+The actual dataset contains 9 columns. The description of attributes on the header page contains 9 attributes. None of the fields is a unique identifier that clearly should be excluded from analysis. The last column, Rings, is "the value to predict".
 
+```
+   Given is the attribute name, attribute type, the measurement unit and a
+   brief description.  The number of rings is the value to predict: either
+   as a continuous value or as a classification problem.
+
+    Name		Data Type	Meas.	Description
+	----		---------	-----	-----------
+	Sex		nominal			M, F, and I (infant)
+	Length		continuous	mm	Longest shell measurement
+	Diameter	continuous	mm	perpendicular to length
+	Height		continuous	mm	with meat in shell
+	Whole weight	continuous	grams	whole abalone
+	Shucked weight	continuous	grams	weight of meat
+	Viscera weight	continuous	grams	gut weight (after bleeding)
+	Shell weight	continuous	grams	after being dried
+	Rings		integer			+1.5 gives the age in years
+
+   Statistics for numeric domains:
+
+		Length	Diam	Height	Whole	Shucked	Viscera	Shell	Rings
+	Min	0.075	0.055	0.000	0.002	0.001	0.001	0.002	    1
+	Max	0.815	0.650	1.130	2.826	1.488	0.760	1.005	   29
+	Mean	0.524	0.408	0.140	0.829	0.359	0.181	0.239	9.934
+	SD	0.120	0.099	0.042	0.490	0.222	0.110	0.139	3.224
+	Correl	0.557	0.575	0.557	0.540	0.421	0.504	0.628	  1.0
+```
+The dataset does not contain a header row. Add appropriate column headers.
+
+```{r}
+urlUciAboloneData <- "http://archive.ics.uci.edu/ml/machine-learning-databases/abalone/abalone.data"
+abo <- read.csv(urlUciAboloneData, header=FALSE)
+abo_names=c("Sex","Length", "Diameter","Height", "Whole_weight", "Shucked_weight", 
+    "Viscera_weight","Shell_weight","Rings")
+names(abo) <- abo_names
+
+```
+Put the data.frame into a data.table in order to simplify column references below.
+```{r}
+library(data.table)
+abodt <- data.table(abo)
+summary(abodt)
+```
+
+## Deciles
+### Assignment
+a.    "Use the command 'quantile' to find the deciles (10 groups) for height from the complete data set. Hint: you may find the command “seq” helpful."
+
+### Implementation
+```{r}
+heightDecile <- quantile(abodt$Height, probs=seq(0, 1, 0.1))
+heightDecile
+```
+Note: values in vector (Height) need not be sorted. Quantile will sort.
+
+Sanity check: First quartile value is between 20% and %30; third quartile is between 70% and 80%.
+
+## Age vs Height Deciles
+### Assignment
+b.	"Use the command “cut” to assign each height value to the corresponding decile (e.g., the smallest values are assigned to the first decile and get mapped to the value, 1). Hint: use “as.numeric” to get integer values instead of ranges."
+c.	"Now create a table of age vs. height decile. Examine the table and describe what you observe."
+
+### Implementation
+
+The dataset does not contain an age column. However, Rings provides the data for calculating age: the description for Rings says that "+1.5 gives the age in years".
+
+```{r}
+abodt$Age <- abodt$Rings + 1.5
+```
+Heights are mostly in the first two deciles the value range, with a few "highliers":
+```{r}
+hist(abodt$Height)
+cuts <- as.numeric(cut(sort(abodt$Height), 10))
+table(cuts)
+```
+Age decile vs height decile:
+```{r}
+ageDecile <- quantile(abodt$Age, probs=seq(0, 1, 0.1))
+table(ageDecile, heightDecile)
+```
+Roughly linear. Positively correlated (`r sprintf("%1.2f", cor(ageDecile, heightDecile))`)
+
+## Average Weight as Function of Age
+
+### Assignment
+d.	"Another way to aggregate the data is averaging. Let’s compute the average whole weight of abalone as a function of age and plot the relationship."
+
+i.	"Use the commands “unique” and “sort” to find the unique values of Age and store the values in ascending order to a variable named “ua”'."
+
+ii.	"Use the command “sapply” to apply a function to each value in “ua”. The function should return the mean whole weight of all abalone of a given age. Hint: type “help(‘function’)” to find out more about user defined functions. The quotes inside the parentheses are important."
+
+iii.    "Finally, use the “plot” command to plot mean weight vs. age. Describe the relationship revealed by the plot. Include an explanation for the behavior seen in the abalone of the 25-30 year age group."
+
+### Implementation
+
+```{r}
+ua <- sort(unique(abodt$Age))
+
+wholeWeightMean <- function(age, abo_dt) {
+    mean(abo_dt[Age == age, Whole_weight])
+}
+
+wholeWeightMeansByAge <- sapply(ua, wholeWeightMean, abodt)
+
+plot(ua, wholeWeightMeansByAge)
+```
+
+Weight grows with age until plateauing around 13 years. Weight means above 25 years scatter because the population at that age is very small (`r length(abodt$Age[abodt$Age > 25])` out of a population of `r length(abodt$Age)`).
