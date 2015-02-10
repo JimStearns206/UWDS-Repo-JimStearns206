@@ -26,12 +26,13 @@ tables <- readHTMLTable(url)
 
 # get teams 1-34
 teams <- tables[[4]]
-names(teams) <- sapply(teams[1,], as.character)
+#names(teams) <- sapply(teams[1,], as.character)
+# Remove duplicate first entry (currently a record for Kansas)
 teams <- teams[-1,]
 
 # get teams 35-68
 teams2 <- tables[[5]]
-names(teams2) <- sapply(teams2[1,], as.character)
+#names(teams2) <- sapply(teams2[1,], as.character)
 teams2 <- teams2[-1,]
 
 # Get remaining teams
@@ -40,11 +41,11 @@ tables <- readHTMLTable(url)
 
 # skip first row for formatting reasons
 teams3 <- tables[[4]]
-names(teams3) <- sapply(teams3[1,], as.character)
+#names(teams3) <- sapply(teams3[1,], as.character)
 teams3 <- teams3[2:nrow(teams3),]
 
 teams4 <- tables[[5]]
-names(teams4) <- sapply(teams4[1,], as.character)
+#names(teams4) <- sapply(teams4[1,], as.character)
 teams4 <- teams4[2:nrow(teams4),]
 
 teams <- rbind(teams, teams2, teams3, teams4)
