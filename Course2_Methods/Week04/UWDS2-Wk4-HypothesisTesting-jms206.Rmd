@@ -1,0 +1,160 @@
+---
+title: "UWDS2-Wk4-HypothesisTesting-jms206"
+author: "Jim Stearns, NetID=jms206"
+date: "Due 10 Feb 2015"
+output: 
+    pdf_document:
+        latex_engine: xelatex
+geometry: margin=0.5in
+fontsize: 12pt
+mainfont: Verdana
+monofont: Consolas
+---
+
+```{r setup, echo=FALSE}
+setwd("~jimstearns/GoogleDrive/Learning/Courses/UWPCE-DataScience/UWDS-Repo-JimStearns206/Course2_Methods/Week04")
+```
+# 1. NCAA and LRMC (Logistic Regression/Markov Chain) Model
+
+"There are 67 games in the NCAA tournament. Suppose that you tested the LRMC model over five years and correctly predicted the following number of games for each year: 44, 42, 47, 43, and 46. Say that you also find that the experts (RPI-Ratings Percentage Index) are right 64% of the time. Perform a hypothesis test to determine whether the LRMC model is more accurate than the experts on average. You may assume that the number of games predicted follows a normal distribution."
+
+Null hypotheses: LRMC is not more predictive than RPI experts.
+
+Cause to reject the null hypothesis: a p-value < 0.05. I.e. there is less than a one in 20 chance of committing a Type I error (a false positive that LRMC is more predictive than RPI).
+
+Technique: calculate t-test and p-value. T-test chosen because it is good with small sample sizes (< 30; here: 5)
+
+```{r}
+p_value_threshold = 0.05
+nGames = 67
+mu_rpi = 0.64 * nGames
+nGamesRight = c(44, 42, 47, 43, 46)
+n = length(nGamesRight)
+
+s = sd(nGamesRight)
+se = s/sqrt(n)
+t_value = (mean(nGamesRight) - mu_rpi) / se
+p_value = dt(t_value, df=n-1)
+# Stop if not expected result.
+stopifnot(p_value > p_value_threshold)
+```
+
+A p-value of `r sprintf("%0.3f", p_value)` is greater than the p-value threshold of 
+`r sprintf("%0.3f", p_value_threshold)`. Therefore, we are are unable to reject the null hypothesis that LRMC is no more predictive than RPI.
+
+# 2. t-Test on Birth Data
+
+"Use the birth data to perform a t-test to determine whether the mean due date of a second child is significantly greater than that of a first in mothers with two or more children."
+
+A two-sample t-Test will be employed to determine whether the two population means are significantly different. Both distributions are assumed to be normal. 
+
+Can we assume that the variances of the two populations are near-equal?
+
+Given: the sample size (first-born and second-born) is the same.
+
+```{r}
+birthDataFilename <- "birthDataDays.csv"
+stopifnot(file.exists(birthDataFilename))
+bdd <- read.csv(birthDataFilename)
+# Remove the redundant "X" (same as ID field)
+bdd$X <- NULL
+summary(bdd)
+var1st = var(bdd$First)
+var2nd = var(bdd$Second)
+abs(var1st - var2nd) / max(var1st, var2nd)
+```
+
+The variances are not nearly equal.
+
+We are testing for near equality. Therefore, a a two-sided test will be used.
+
+```{r}
+tTestResult = t.test(bdd$First, bdd$Second, alternative="two.sided", var.equal=FALSE)
+```
+A p-value of `r sprintf("%0.3f", tTestResult$p.value)` is greater than 0.05. We therefore cannot reject the null hypothesis that the true difference in means is near-zero.
+
+# 3. Chi-Squared Test and NFL Data
+
+"The Superbowl outcome was close to call [according to Nate Silver](http://blogs.seattletimes.com/seahawks/2014/01/29/super-bowl-nate-silver-picks-seahawks-madden-25-has-broncos/), but not according to Vegas. Despite having two strong teams, odds makers are favoring Denver by 2.5 points (last I checked: note that odds are frequently updated). Is such a small difference meaningful? Are the odds makers better than a random guess in these cases? Use a chi-squared test to see if the favored team wins any more or less often than would be expected by a random guess when the spread is (strictly) less than 3 points."
+
+* "a.    Use data from the 2013 regular season. [Here is one source](http://www.oddsshark.com/stats/scoreboardbyweek/football/nfl/1/2013). Given the format, it's probably faster to tabulate this data by hand than by using R. Fortunately there aren't too many games with such a small spread, so it's manageable. Feel free to use other sources that are easier to manipulate in R if you find them."
+
+Classmate Gabriel Ramirez kindly posted a [web-page scraping R script](https://gist.github.com/ramirezg/442b3f709b60e3d7eb86/download#). I have used this to extract all the NFL games in the the 16-week 2013 regular season.
+```{r}
+require(XML)
+source("sports_scraper_GabrielRamirez.R", echo=TRUE, max.deparse.length=10000)
+allGames = data
+lineLt3Games = allGames[abs(allGames$team_1_line) < 3,]
+head(lineLt3Games)
+str(lineLt3Games)
+```
+The logic below assumes no tie games (by means of extra quarter play) and no zero line(One team must be favored, even if only by 0.5). 
+```{r}
+# data sanity checks
+# No tie score games
+stopifnot(lineLt3Games$team_1_score != lineLt3Games$team_2_score)
+# No zero line. 
+stopifnot(lineLt3Games$team_1_line != 0)
+```
+
+Add indicator variables for how line-picks and random picks did.
+```{r}
+# "T1W": Team 1 Wins
+# "T1LF": Team 1 is Line-Favored (Team 1's line value < 0)
+# "LFTW": Line-Favored Team Wins
+lineLt3Games$T1W = lineLt3Games$team_1_score > lineLt3Games$team_2_score
+lineLt3Games$T1LF = lineLt3Games$team_1_line < 0
+lineLt3Games$LFTW = (lineLt3Games$T1W == lineLt3Games$T1LF)
+
+# Randomly pick Team 1 or 2 to win, then score whether random pick was correct.
+# "RP": Random Pick. 0 == Team1 picked, 1 == Team2 picked.
+# "RPW" Random Pick Wins
+set.seed(206)
+lineLt3Games$RP = rbinom(nrow(lineLt3Games), 1, 0.5)
+lineLt3Games$RPW = ((lineLt3Games$RP == 0 & lineLt3Games$T1W)
+                    | (lineLt3Games$RP == 1 & !lineLt3Games$T1W))
+```
+Raw results right/wrong picks for line, random:
+```{r}
+length(which(lineLt3Games$LFTW == TRUE))
+length(which(lineLt3Games$LFTW == FALSE))
+length(which(lineLt3Games$RPW == TRUE))
+length(which(lineLt3Games$RPW == FALSE))
+```
+* "b.    The "line" in the data is equivalent to the spread. The line is negative for the favored team."
+
+* "c.    Construct a contingency table with the groups "Favored Team Wins" and "Favored Team Loses" on one axis and the groups "Spread < 3" and "Random Spread" on the other."
+
+```{r}
+wltable = table(lineLt3Games$LFTW, lineLt3Games$RPW, dnn=c("Line<3","Random Spread"))
+colnames(wltable) = c("Wrong", "Right")
+rownames(wltable) = c("Wrong", "Right")
+wltable
+
+```
+* "d.    Perform a chi-squared test at the 5% level and explain the results."
+```{r}
+chisqResult = chisq.test(wltable, correct=FALSE)
+chisqResult
+```
+The chi-squared test yields a p-value of `r chisqResult$p.value`, many times above the 0.05 standard confidence level threshold. Therefore, the null hypothesis that the random choices are independent of line choices cannot be rejected. The line picks aren't significantly better than random picks.
+
+# 4. Improving the LRMC Model with Additional Data
+
+"We will start working with the LRMC model for ranking division 1 NCAA men’s basketball teams. The model depends on the point difference in head-to-head matches during the regular season as well as which team was the home team. The model is strikingly useful given how simple and accessible the input data are (all the information needed for the basic model can be found at http://www.sports-reference.com/cbb/ as well as other sources). 
+
+The challenge for you this quarter is to try to improve this model by finding additional data that improves the model’s performance. We’ll start by evaluating the potential of new features.
+
+1.	Propose new data.
+a.	Select new data to add to the basic LRMC model.  Be sure to pick something that you will be able to measure.
+2.	State a hypothesis and describe a test for it.
+a.	State a hypothesis about this new data and describe a test that can be used to evaluate it. For example, you may think that teams that eat oranges for breakfast are more likely to win games than those that do not. You could then propose using a chi-squared test to compare the game outcomes of one set of teams to those in the other – does orange eating improve the odds?
+3.	Obtain the data and perform the test; interpret your results.
+a.	The file NCAA.R is a script that fetches data and runs the basic LRMC model. If you want to use data from sports-reference.com, or a similar source, the file contains code that you might find useful. 
+b.	Notes
+•	How’d LRMC do last year? At the end of the script the model is used to predict the winners of all individual games in this year’s NCAA tournament (this is not the same as picking a bracket). 
+•	There's a similar calculation for RPI, but note that the source is the current season's RPI rankings so this will only be meaningful once the 2014 tournament ends.
+c.	Warnings 
+•	The script takes several minutes to run.
+•	The script depends on the XML package for reading data from web pages. If issues with this is package are blocking your progress, please ask for help.
+•	You don’t need to understand the code line by line, your task this week is only to test out a new candidate data source, not to incorporate it into the model. However, if you are interested then two academic papers about the model are also included along with the script."
