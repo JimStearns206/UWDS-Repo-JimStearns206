@@ -152,9 +152,25 @@ a.	State a hypothesis about this new data and describe a test that can be used t
 3.	Obtain the data and perform the test; interpret your results.
 a.	The file NCAA.R is a script that fetches data and runs the basic LRMC model. If you want to use data from sports-reference.com, or a similar source, the file contains code that you might find useful. 
 b.	Notes
-•	How’d LRMC do last year? At the end of the script the model is used to predict the winners of all individual games in this year’s NCAA tournament (this is not the same as picking a bracket). 
-•	There's a similar calculation for RPI, but note that the source is the current season's RPI rankings so this will only be meaningful once the 2014 tournament ends.
+*	How’d LRMC do last year? At the end of the script the model is used to predict the winners of all individual games in this year’s NCAA tournament (this is not the same as picking a bracket). 
+*	There's a similar calculation for RPI, but note that the source is the current season's RPI rankings so this will only be meaningful once the 2014 tournament ends.
 c.	Warnings 
-•	The script takes several minutes to run.
-•	The script depends on the XML package for reading data from web pages. If issues with this is package are blocking your progress, please ask for help.
-•	You don’t need to understand the code line by line, your task this week is only to test out a new candidate data source, not to incorporate it into the model. However, if you are interested then two academic papers about the model are also included along with the script."
+*	The script takes several minutes to run.
+*	The script depends on the XML package for reading data from web pages. If issues with this is package are blocking your progress, please ask for help.
+*	You don’t need to understand the code line by line, your task this week is only to test out a new candidate data source, not to incorporate it into the model. However, if you are interested then two academic papers about the model are also included along with the script."
+
+### Propose New Data
+
+The teams data.frame contains a Strength Of Schedule metric and ranking. Seems relevant. Calculate metric based upon average of LRMC score and SOS score.
+
+### Select new data to add to the basic LRMC model.
+
+SOS was already a metric in the data.frame. 
+
+### Obtain the NCAA data and perform the test; interpret your results
+
+Here's the NCAA script with the addition of the LRMC+SOS metric:
+```{r}
+source("NCAA.R", echo=TRUE, max.deparse.length=100000)
+```
+LRMC+SOS correctly predicts 40 games out of 57. LRMC by itself predicts 41. A chi-squared analysis is not needed to fail to reject the null hypothesis that LRMC+SOS is no more predictive than LRMC by itself.

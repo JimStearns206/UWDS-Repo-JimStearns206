@@ -462,3 +462,47 @@ print("RPI")
 print(correct)
 print(total)
 print(correct/total)
+
+########################################
+# ==== Add LRMC+SOS measurement/scoring
+########################################
+# add LRMC score to table and sort to get ranking
+teams$LRMC_normed = (teams$LRMC.score - min(teams$LRMC.score)) / (max(teams$LRMC.score) - min(teams$LRMC.score))
+teams$SOS_numeric = as.numeric(as.character(teams$SOS))
+teams$SOS_normed = ((teams$SOS_numeric - min(teams$SOS_numeric))
+                    / (max(teams$SOS_numeric) - min(teams$SOS_numeric)))
+teams$LRMC_SOS = (teams$LRMC_normed + teams$SOS_normed) / 2
+teams <- teams[order(teams$LRMC_SOS, decreasing=TRUE),]
+
+teams.alpha <- teams[order(teams$School, decreasing=FALSE),]
+
+# for each matchup in the NCAA Tournement, compute the number of
+# times the LRMC model predicted the winner.
+correct <- 0
+total <- length(ncaa.team1)
+for(i in 1:total) {
+    
+    score1 <- teams$LRMC_SOS[teams$url.name == ncaa.team1[i]]
+    score2 <- teams$LRMC_SOS[teams$url.name == ncaa.team2[i]]
+    
+    symbol <- "X"
+    
+    if(ncaa.winner[i] == 1 & score1 > score2) {
+        correct <- correct + 1
+        symbol <- "*"
+    }
+    
+    if(ncaa.winner[i] == 2 & score2 > score1) {
+        correct <- correct + 1
+        symbol <- "*"
+    }
+    
+    print(paste(symbol,paste(paste(ncaa.team1[i],"vs."),ncaa.team2[i])))
+    
+}
+
+# correct picks in the NCAA tournement based on LRMC + Strength of Schedule
+print("LRMC+SOS")
+print(correct)
+print(total)
+print(correct/total)
