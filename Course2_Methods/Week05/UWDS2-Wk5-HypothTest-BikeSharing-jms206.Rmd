@@ -89,9 +89,35 @@ dow$bucket <- cut(dow$proportionRegistered, seq(from=0.0,to=1.0,by=0.2), labels=
 ```
 # 3. Hypothesis Test: Distribution of Casual Riders by Day of Week
 
-Consider the distribution of registered user rides for each day of the week. Is it the same as the distribution of casual user rides for each day of the week (use a hypothesis test)?
+"Consider the distribution of registered user rides for each day of the week. Is it the same as the distribution of casual user rides for each day of the week (use a hypothesis test)?"
 
+For each day of the week, perform a Kormogorov-Smirnov test comparing the distribution of casual samples to registered rider samples. Test the null hypothesis that the two distributions are independent.
 
+```{r}
+performKSForDayOfWeek <- function(dow, df) {
+    stopifnot(dow >= 0 & dow < 7)
+    stopifnot('casual' %in% colnames(df))
+    stopifnot('registered' %in% colnames(df))
+    stopifnot('dayOfWeek' %in% colnames(df))
+
+    samples = subset(df, dayOfWeek==dow, c(casual, registered))
+    ksresult = ks.test(samples$casual, samples$registered)
+    ksresult$p.value
+}
+
+ksresults = data.frame()
+for (dow in 0:6) {
+    pvalue <- performKSForDayOfWeek(dow, ridedated)
+    ksresults = rbind(ksresults, c(dow, pvalue))
+}
+colnames(ksresults) = c("dow", "p_value")
+ksresults
+
+rejectNullHypothesis = all(ksresults$p_value < 0.05)
+maxPValue = max(ksresults$p_value)
+stopifnot(rejectNullHypothesis == TRUE)
+```
+For all days of the week, the p-value from the Kolmogorov-Smirnov test is less than the confidence threshold of 0.05. Therefore, the null hypothesis that the distribution of casual riders is independent of the distribution of registered users is rejected.
 
 # 4. Hypothesis Test: Weekend vs Weekday Ridership
 
