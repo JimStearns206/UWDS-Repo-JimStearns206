@@ -40,29 +40,28 @@ stopifnot(all(ridedated$weekday == ridedated$dayOfWeek))
 
 Gather the total number of riders in each category and for each day of the week into a contingency table. Are rider category and day of week independent (use a hypothesis test)?
 
-Aggregate:
+Let's combine the two categories, casual and registered, into a proportion of registered for each day:
 ```{r}
-#ridedated$proportionRegistered <- with(ridedated, registered / cnt)
-#ridedated$bucketRegistered <- cut(ridedated$proportionRegistered, seq(from=0.0,to=1.0,by=0.1))
-dow <- aggregate(cbind(casual, registered) ~ dayOfWeek, data=ridedated,FUN=sum)
-#dow <- aggregate(proportionRegistered ~ dayOfWeek, data=ridedated,FUN=mean)
+ridedated$proportionRegistered <- with(ridedated, registered / cnt)
 ```
 
-Bucketize:
+Aggregate by day of week:
 ```{r}
-dow$casualBucketized <- with(dow, cut(dow$casual, 10, labels=FALSE))
-dow$registeredBucketized <- with(dow, cut(dow$registered, 10, labels=FALSE))
+dow <- aggregate(proportionRegistered ~ dayOfWeek, data=ridedated,FUN=mean)
+```
+
+Bucketize the proportion into deciles:
+```{r}
+dow$proportionBucketized <- cut(dow$proportionRegistered, 10, labels=FALSE)
 ```
 Contingency Table:
 ```{r}
-dowct <- with(dow, table(casualBucketized, registeredBucketized))
-#dowct <- with(ridedated, table(dayOfWeek, bucketRegistered, 
-#                               exclude=c('(0,0.1]', '(0.1,0.2]', '(0.2,0.3]', '(0.3,0.4]'))
+dowct <- with(dow, table(dayOfWeek, proportionRegistered))
 ```
 
 Chi-Squared Test:
 ```{r}
-dowcs <- chisq.test(dowct)
+dowcs <- chisq.test(dow$dayOfWeek, dow$proportionBucketized)
 ```
 Googling says that the warning "Chi-squared approximation may be incorrect"
 is due to small values in some of the cells of the contingency table. 
@@ -75,23 +74,6 @@ stopifnot(dowcs$p.value > 0.2)
 The p-value of `r sprintf("%0.3f", dowcs$p.value)` is greater than the 0.05 significance level. Therefore, we do not reject the null hypothesis that the proportion of registered bicyclists is independent of the day of the week.
 
 This despite the fact that there are many more casual riders on the weekend than on weekdays.
-
-I'm uncomfortable using a chi-square with only one of the variables qualitative (day of week). Proportion is qualitative, between 0.6 and 0.9.
-
-Does the chi-square result change if proportion is bucketized?
-```{r}
-# Break into proportion of registered riders each day into deciles.
-dow$bucket <- cut(dow$proportionRegistered, 10, labels=FALSE) 
-dow
-# Contingency Table:
-dowct2 <- with(dow, table(dayOfWeek, bucket))
-```
-
-Chi-Squared Test:
-```{r}
-dowcs2 <- chisq.test(dowct2)
-dowcs2
-```
 
 ```{r, echo=FALSE}
 ##
