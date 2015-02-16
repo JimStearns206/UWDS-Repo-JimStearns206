@@ -42,16 +42,22 @@ Gather the total number of riders in each category and for each day of the week 
 
 Aggregate:
 ```{r}
-dow <- aggregate(cbind(casual, registered, cnt) ~ dayOfWeek, data=ridedated,FUN=sum)
-```
-We choose to use the proportion of riders registered on each day as our measure of "rider category":
-```{r}
-dow$proportionRegistered <- with(dow, registered / cnt)
+#ridedated$proportionRegistered <- with(ridedated, registered / cnt)
+#ridedated$bucketRegistered <- cut(ridedated$proportionRegistered, seq(from=0.0,to=1.0,by=0.1))
+dow <- aggregate(cbind(casual, registered) ~ dayOfWeek, data=ridedated,FUN=sum)
+#dow <- aggregate(proportionRegistered ~ dayOfWeek, data=ridedated,FUN=mean)
 ```
 
+Bucketize:
+```{r}
+dow$casualBucketized <- with(dow, cut(dow$casual, 10, labels=FALSE))
+dow$registeredBucketized <- with(dow, cut(dow$registered, 10, labels=FALSE))
+```
 Contingency Table:
 ```{r}
-dowct <- with(dow, table(dayOfWeek, proportionRegistered))
+dowct <- with(dow, table(casualBucketized, registeredBucketized))
+#dowct <- with(ridedated, table(dayOfWeek, bucketRegistered, 
+#                               exclude=c('(0,0.1]', '(0.1,0.2]', '(0.2,0.3]', '(0.3,0.4]'))
 ```
 
 Chi-Squared Test:
@@ -69,6 +75,23 @@ stopifnot(dowcs$p.value > 0.2)
 The p-value of `r sprintf("%0.3f", dowcs$p.value)` is greater than the 0.05 significance level. Therefore, we do not reject the null hypothesis that the proportion of registered bicyclists is independent of the day of the week.
 
 This despite the fact that there are many more casual riders on the weekend than on weekdays.
+
+I'm uncomfortable using a chi-square with only one of the variables qualitative (day of week). Proportion is qualitative, between 0.6 and 0.9.
+
+Does the chi-square result change if proportion is bucketized?
+```{r}
+# Break into proportion of registered riders each day into deciles.
+dow$bucket <- cut(dow$proportionRegistered, 10, labels=FALSE) 
+dow
+# Contingency Table:
+dowct2 <- with(dow, table(dayOfWeek, bucket))
+```
+
+Chi-Squared Test:
+```{r}
+dowcs2 <- chisq.test(dowct2)
+dowcs2
+```
 
 ```{r, echo=FALSE}
 ##
