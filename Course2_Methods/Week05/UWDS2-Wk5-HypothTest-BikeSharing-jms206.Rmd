@@ -22,7 +22,7 @@ There are two kinds of participants in the dataset: casual and registered. Let's
 
 # 1. Data Preparation
 
-"Transform the "dteday" variable into a date/time object using the strptime function, and create a new feature in the dataset that represents the day of the week. The function strptime produces a result of type POSIXlt. It is a list, and one of its elements is named "wday": the day of the week in numeric form. (You'll notice that there is already a column in the dataset called "weekday". This exercise is for you to practice manipulating dates in R. Your solution should correspond to this column.)"
+"Transform the 'dteday' variable into a date/time object using the strptime function, and create a new feature in the dataset that represents the day of the week. The function strptime produces a result of type POSIXlt. It is a list, and one of its elements is named 'wday': the day of the week in numeric form. (You'll notice that there is already a column in the dataset called 'weekday'. This exercise is for you to practice manipulating dates in R. Your solution should correspond to this column)."
 
 Downloaded data folder from supplied URL. Two csv datasets were found: "day.csv" (~700 records) and "hour.csv" (~17K records). Since questions revolve around day of week, not hour of day, the day.csv file was used (renamed to Bike-Sharing-Dataset-day.csv)
 
@@ -38,7 +38,7 @@ stopifnot(all(ridedated$weekday == ridedated$dayOfWeek))
 
 # 2. Hypothesis Test: Riders by Day of Week
 
-Gather the total number of riders in each category and for each day of the week into a contingency table. Are rider category and day of week independent (use a hypothesis test)?
+"Gather the total number of riders in each category and for each day of the week into a contingency table. Are rider category and day of week independent (use a hypothesis test)?"
 
 Let's combine the two categories, casual and registered, into a proportion of registered for each day:
 ```{r}
@@ -47,7 +47,7 @@ ridedated$proportionRegistered <- with(ridedated, registered / cnt)
 
 Aggregate by day of week:
 ```{r}
-dow <- aggregate(proportionRegistered ~ dayOfWeek, data=ridedated,FUN=mean)
+dow <- aggregate(proportionRegistered ~ dayOfWeek, data=ridedated, FUN=mean)
 ```
 
 Bucketize the proportion into deciles:
@@ -100,7 +100,7 @@ performKSForDayOfWeek <- function(dow, df) {
     stopifnot('registered' %in% colnames(df))
     stopifnot('dayOfWeek' %in% colnames(df))
 
-    samples = subset(df, dayOfWeek==dow, c(casual, registered))
+    samples = subset(df, dayOfWeek==dow, select=c(casual, registered))
     ksresult = ks.test(samples$casual, samples$registered)
     ksresult$p.value
 }
@@ -121,8 +121,33 @@ For all days of the week, the p-value from the Kolmogorov-Smirnov test is less t
 
 # 4. Hypothesis Test: Weekend vs Weekday Ridership
 
-On average, do more people ride on the weekends or on weekdays (use a hypothesis test)? This refers to the total number of rides per day, registered and casual.
+"On average, do more people ride on the weekends or on weekdays (use a hypothesis test)? This refers to the total number of rides per day, registered and casual."
+
+t-Test for equal means:
+* $H_{0}$: Average ridership on work days and on weekends are the same.
+* Compare two samples to determine if two population means are equal.
+* Data is not paired (no one-to-one correspondence between values in the two samples)
+* Do not assume variances of the two samples are the same.
+
+```{r}
+ttresult <- t.test(subset(ridedated, workingday==1, select=cnt),
+                   subset(ridedated, workingday==0, select=cnt),
+                   paired=FALSE, var.equal=FALSE, conf.level=0.95,
+                   alternative="two.sided")
+ttresult
+stopifnot(ttresult$p.value > 0.05)
+workdaymean <- ttresult$x
+weekendmean <- ttresult$y
+stopifnot(workdaymean > weekendmean)
+stopifnot(workdaymean > weekendmean * 1.1)
+```
+
+While the average number of riders on a workday is more than 10% larger than the average number of rider on a weekend day, the null hypothesis that the average ridership is the same on work days and on weekends cannot be rejected because the p-value of `r sprintf("%0.3f", ttresult$p.value)` is more than the significance level of 0.05 (confidence level of 0.95).
 
 # 5. Weekend vs Weekday Ridership: t-test Appropriate?
 
-Why is it reasonable to apply a t-test is appropriate for use in answering question 4? 
+"Why is it reasonable to apply a t-test is appropriate for use in answering question 4?"
+
+Because of the presence of the qualifier "on average". The t-test is used to test the equivalence of two population **means**.
+
+More broadly, a t-test is used to test the equivalence of two normally distributed values. The mean values estimated from different sample follow normal distribution (Central Limit Theorem).
