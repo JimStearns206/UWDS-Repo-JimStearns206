@@ -1,0 +1,187 @@
+---
+title: "UWDS2-Wk6-LinearModeling-Abalone-jms206"
+author: "Jim Stearns, NetID=jms206"
+date: "Due 24 Feb 2015"
+output: 
+    pdf_document:
+        latex_engine: xelatex
+geometry: margin=0.5in
+fontsize: 12pt
+mainfont: Verdana
+monofont: Consolas
+---
+
+```{r setup, echo=FALSE}
+setwd("~jimstearns/GoogleDrive/Learning/Courses/UWPCE-DataScience/UWDS-Repo-JimStearns206/Course2_Methods/Week06")
+```
+# Overview
+
+**This assignment uses the abalone dataset from the UCI machine learning data repository. Each row in the dataset describes a different abalone, including its sex, linear dimensions, and weights. The last column contains the number of rings in an abalone’s shell. This is a proxy for the abalone’s age, just as tree rings tell us how old a tree is. The problem we face is coming up with an easy to apply model that predicts the number of rings (counting them is laborious and pretty unpleasant for the abalone, which gets sawed in half). ** 
+
+**The data is available here: (http://archive.ics.uci.edu/ml/machine-learning-databases/abalone/abalone.data) **
+    
+**The data description is here: (http://archive.ics.uci.edu/ml/machine-learning-databases/abalone/abalone.names)**
+    
+    
+```{r data-preparation}
+urlUciAboloneData <- "http://archive.ics.uci.edu/ml/machine-learning-databases/abalone/abalone.data"
+abo <- read.csv(urlUciAboloneData, header=FALSE)
+abo_names=c("Sex","Length", "Diameter","Height", "Whole_weight", "Shucked_weight", 
+    "Viscera_weight","Shell_weight","Rings")
+names(abo) <- abo_names
+
+```
+Put the data.frame into a data.table in order to simplify column references below.
+```{r}
+library(data.table)
+abodt <- data.table(abo)
+summary(abodt)
+```
+
+# 1. Plot Rings vs Length
+
+**Plot the number of rings as a function of length.**
+
+```{r}
+plot(abodt$Length, abodt$Rings)
+```
+  
+# 2. Linear Model: Rings ~ Length
+    
+                                     
+__ Fit a linear model to this data (rings  = a*length + b) using R’s lm command. Examine the output of the summary table for the fit. Is length a significant factor? __
+
+```{r}
+abolm <- lm(Rings ~ Length, data=abodt)
+abolm_summary <- summary(abolm)
+abolm_summary
+```
+
+With a p-value < 2^15, length is a significant factor.
+
+# 3. Linear Model, Immature Abalone: Rings ~ Length
+
+__There are three sexes of abalone: male, female, and immature. Filter the data so that only the immature abalone remain. Fit the same model to this data (rings = a*length + b). Examine the output of summary: is this model a better or worse than the model fit to all of the data?__
+
+```{r}
+immaturedt <- abodt[abodt$Sex == "I",]
+with (immaturedt, plot(Length, Rings))
+immaturelm1 <- lm(Rings ~ Length, data=immaturedt)
+immaturelm1_summary <- summary(immaturelm1)
+immaturelm1_summary
+stopifnot(abolm_summary$adj.r.squared < immaturelm1_summary$adj.r.squared)
+```
+
+"Goodness of fit" is usually defined by $R^2$, or the fraction of variance in the data that's explained by the model.
+
+The *adjusted $R^2$* value is used here, rather than $R^2$, in preparation for comparing this value to that obtained when the number of predictors is increased (e.g. height and diameter). Unadjusted $R^2$ can be inflated by the mere presence of additional predictors. *Adjusted $R^2$* takes the number of predictors into account.
+
+The *adjusted $R^2$* value for linear model of immature abalone of `r sprintf("%0.2f", immaturelm1_summary$adj.r.squared)` is notably larger than the corresponding value of `r sprintf("%0.2f", abolm_summary$adj.r.squared)` for the linear model of the entire abolone sample (female, male, and immature).
+
+In summary, a linear model using Length as a sole predictor of rings is a better predictor when applied to the immature (pre-adult) subset of abolone than when applied to the entire dataset.
+
+# 4. Linear Model, Immature Abalone: Rings ~ Length + Height + Diameter
+
+**Still working with the immature abalone only, add Height and Diameter to the model (rings = a*length + b*height + etc.). Examine the output of summary: what are the significant factors in this new model? Compare the result to the “length only” model and explain why the two results on consistent with each other.**
+
+```{r}
+immaturelm2 <- lm(Rings ~ Length + Height + Diameter, data=immaturedt)
+immaturelm2_summary <- summary(immaturelm2)
+immaturelm2_summary
+
+# Assert expected p-values for the three predictors:
+stopifnot(immaturelm2_summary$coefficients["Length","Pr(>|t|)"] > 0.25)
+stopifnot(immaturelm2_summary$coefficients["Height","Pr(>|t|)"] < 0.05)
+stopifnot(immaturelm2_summary$coefficients["Diameter","Pr(>|t|)"] < 0.05)
+```
+
+The significant predictors (significant: a p-value less than 0.05) are *Height* and *Diameter* (with p-values of 
+`r sprintf("%0.3f", immaturelm2_summary$coefficients["Height","Pr(>|t|)"])` and 
+`r sprintf("%0.3f", immaturelm2_summary$coefficients["Diameter","Pr(>|t|)"])`
+, respectively. 
+*Length* is not significant (p-value of 
+`r sprintf("%0.2f", immaturelm2_summary$coefficients["Length","Pr(>|t|)"])` 
+is greater than 0.05).
+
+**Compare the result to the 'length only' model and explain why the two results on consistent with each other.**
+
+```{r, echo=FALSE}
+# Assert: adjusted R^2 with two predictors is better than that with just one predictor
+stopifnot(immaturelm2_summary$adj.r.squared > immaturelm1_summary$adj.r.squared)
+```
+
+The fit with three predictors (two, effectively, because of $Length$'s high p-value) is better than with one predictor:
+`r sprintf("%0.2f", immaturelm2_summary$adj.r.squared)` vs
+`r sprintf("%0.2f", immaturelm1_summary$adj.r.squared)`.
+
+But why has *Length* been displaced? By itself, it's a pretty good predictor, yet when *Diameter*
+and *Length* are added, it becomes insignificant (high p-value)?
+
+Reason: Because *Length* is strongly correlated with *Diameter* (`r sprintf("%0.3f", cor(immaturedt$Length, immaturedt$Diameter))`).
+
+Sanity Check: Use *Length* with *Diameter* should yield a similar good fit as using *Height* with *Diameter*:
+
+```{r}
+immaturelm3 <- lm(Rings ~ Length + Height, data=immaturedt)
+immaturelm3_summary <- summary(immaturelm3)
+immaturelm3_summary
+stopifnot(abs(immaturelm3_summary$adj.r.squared - immaturelm2_summary$adj.r.squared) < 0.01)
+```
+
+The $adjusted R^2$ values are within 0.01 of each other.
+
+# 5. Linear Model, Immature Abalone: Rings ~ . -Sex
+
+**Still working with the immature abalone only, add all of the factors to the model (except Sex: since we only have immature abalone, this value is the same for every data point) (rings = a*length + b*height + etc.).**
+
+```{r}
+# The following use of "." caused this error:
+# Error in `contrasts<-`(`*tmp*`, value = contr.funs[1 + isOF[nn]]) : 
+# contrasts can be applied only to factors with 2 or more levels
+##mmaturelm4 <- lm(Rings ~ .-Sex, data=immaturedt)
+# Explicitly specifying all the predictors works:
+immaturelm4 <- lm(Rings ~ Length + Diameter + Height + Whole_weight + Shucked_weight + Viscera_weight + Shell_weight, data=immaturedt)
+immaturelm4_summary <- summary(immaturelm4)
+immaturelm4_summary
+# Using all predictors yields a somewhat higher adjusted R^2:
+stopifnot((immaturelm4_summary$adj.r.squared - immaturelm2_summary$adj.r.squared) > 0.05)
+stopifnot(abs(immaturelm4_summary$adj.r.squared - immaturelm2_summary$adj.r.squared) < 0.1)
+```
+
+**Examine the residuals and summarize your observations.**
+
+All predictors were significant except $Length$ and $Diameter$.
+
+The $adjusted R^2$ with all predictors of 0.586 is somewhat but not hugely better than the $adjusted R^2$ for  $Length+Height+Diameter$ of 0.526.
+
+**Use graphical methods (histogram, qqplot, etc.)** 
+  
+```{r}
+par(mfrow=c(2,2))
+plot(immaturelm4)
+
+ringsPredicted <- predict(immaturelm4)
+ringsObserved <- immaturedt$Rings
+plot(ringsObserved, ringsPredicted, main="Scatter Plot: Rings Observed vs Predicted")
+abline(0, 1)
+
+qqplot(ringsObserved, ringsPredicted, main="Q-Q Plot: Rings Observed vs Predicted")
+abline(0, 1)
+```
+
+**Also plot the residuals as a function of the number of rings.**
+  
+Assumption: 'number of rings' means 'observed (not predicted) number of rings'"
+
+```{r}
+immaturelm4_residuals <- resid(immaturelm4)
+stopifnot(length(immaturelm4_residuals) == length(immaturedt$Rings))
+plot(immaturedt$Rings, immaturelm4_residuals, ylab="Residuals", xlab="Observed Rings", 
+     main="Residuals as Function of Observed Number of Rings")
+abline(0,0) # Ideally, all the values would be on this line.
+
+plot(ringsPredicted, immaturelm4_residuals, ylab="Residuals", xlab="Predicted Rings", 
+     main="Residuals as Function of Predicted Number of Rings")
+abline(0,0) # Ideally, all the values would be on this line.
+
+```
