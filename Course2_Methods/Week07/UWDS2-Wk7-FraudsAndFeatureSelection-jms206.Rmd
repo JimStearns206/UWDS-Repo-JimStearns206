@@ -1,0 +1,50 @@
+---
+title: "UWDS2-Wk7-FraudsAndFeatureSelection-jms206"
+author: "Jim Stearns, NetID=jms206"
+date: "Due 3 Mar 2015"
+output: 
+    pdf_document:
+        latex_engine: xelatex
+geometry: margin=0.5in
+fontsize: 12pt
+mainfont: Verdana
+monofont: Consolas
+---
+
+```{r setup, echo=FALSE}
+setwd("~jimstearns/GoogleDrive/Learning/Courses/UWPCE-DataScience/UWDS-Repo-JimStearns206/Course2_Methods/Week07")
+```
+(Assignment language is in _italics_)
+
+# Identifying Fraudulent Retails
+
+_This problem uses real data from a Globys Customer in Latin America (load MobileCarrierHolidayAnalysis2013.csv) and reflects the retailer performance of their customer acquisition campaign for the period Nov 15th 2013 to Jan 15th 2014.  The attributes present in the data are a follows:_
+
+* _Dealer – the (randomly ordered) name of the retailer._
+* _Sales – the number of sales by that dealer during the period._
+* _SalesWithFirstActivity – the number of sales by that dealer with subsequent activity on the SIM card._
+* _MeanTimeToFirstActivity – the mean time in days from activation of the SIM to first activity on the SIM, for those with activity._
+* _MeanAcctBalance – the average account balance in $ for new customers from that retailer._
+* _PctFirstCDR – the percentage of sales who have had at least one activity on the SIM._
+
+_It is common for some unscrupulous retailers (the names have been randomized!) to claim fees for adding new customers who are not real – SIM cards are activated, but never used._
+
+_Your task is to explore the data to identify retailers with sales that demonstrate statistically significantly anomalous behavior on 1 or multiple dimensions. Use hypothesis tests and confidence intervals to establish your confidence in retailers that may be fraudulent.  State your null and alternative hypotheses clearly and accurately describe conclusion of the tests._
+    
+    
+```{r data-preparation}
+# mds: Mobile Dealer Sales
+mds<- read.csv("MobileCarrierHolidayAnalysis2013.csv")
+
+```
+
+# MIC and Enron Emails
+
+_A subset of the Enron emails (209 of 39,861) have been selected because they are associated with a particular topic. The ID numbers of the emails are contained in doc.list.csv. Use mutual information to identify the words most strongly associated with the emails listed in doc.list.csv (i.e., if each word is a feature, rank them based on mutual information)._ 
+
+_Recall that mutual information can be computed by applying mi.plugin() (from the “entropy” package) to a 2x2 contingency table.  See Class 7 Examples R file for some help!_
+
+* _Data Files: docword.enron.txt, vocab.enron.txt, doc.list.csv (see http://archive.ics.uci.edu/ml/datasets/Bag+of+Words for details of the Enron files)_
+
+* _What are the top 10 words that describe the topic common to these emails? _
+* _What is the topic that these emails share? Examine some of the top ranked words and give a short description of the topic that ties the 209 emails together._
