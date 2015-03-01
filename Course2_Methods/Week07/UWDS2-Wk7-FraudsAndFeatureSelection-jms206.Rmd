@@ -16,7 +16,7 @@ setwd("~jimstearns/GoogleDrive/Learning/Courses/UWPCE-DataScience/UWDS-Repo-JimS
 ```
 (Assignment language is in _italics_)
 
-# Identifying Fraudulent Retails
+# Identifying Fraudulent Retailers
 
 _This problem uses real data from a Globys Customer in Latin America (load MobileCarrierHolidayAnalysis2013.csv) and reflects the retailer performance of their customer acquisition campaign for the period Nov 15th 2013 to Jan 15th 2014.  The attributes present in the data are a follows:_
 
@@ -31,20 +31,82 @@ _It is common for some unscrupulous retailers (the names have been randomized!) 
 
 _Your task is to explore the data to identify retailers with sales that demonstrate statistically significantly anomalous behavior on 1 or multiple dimensions. Use hypothesis tests and confidence intervals to establish your confidence in retailers that may be fraudulent.  State your null and alternative hypotheses clearly and accurately describe conclusion of the tests._
     
-    
 ```{r data-preparation}
 # mds: Mobile Dealer Sales
 mds<- read.csv("MobileCarrierHolidayAnalysis2013.csv")
 
 ```
 
-# MIC and Enron Emails
+# Maximal (or Mutual) Information Coefficient (MIC) and Enron Emails
 
 _A subset of the Enron emails (209 of 39,861) have been selected because they are associated with a particular topic. The ID numbers of the emails are contained in doc.list.csv. Use mutual information to identify the words most strongly associated with the emails listed in doc.list.csv (i.e., if each word is a feature, rank them based on mutual information)._ 
 
 _Recall that mutual information can be computed by applying mi.plugin() (from the “entropy” package) to a 2x2 contingency table.  See Class 7 Examples R file for some help!_
 
-* _Data Files: docword.enron.txt, vocab.enron.txt, doc.list.csv (see http://archive.ics.uci.edu/ml/datasets/Bag+of+Words for details of the Enron files)_
+```{r, echo=FALSE}
+require(entropy)
+require(data.table)
+```
+
+From [Wikipedia MIC](https://en.wikipedia.org/wiki/Maximal_information_coefficient):
+
+"The maximal information coefficient uses binning as a means to apply mutual information on continuous random variables. Binning has been used for some time as a way of applying mutual information to continuous distributions; what MIC contributes in addition is a methodology for selecting the number of bins and picking a maximum over many possible grids."
+
+* _Data Files: docword.enron.txt, vocab.enron.txt, doc.list.csv (see (http://archive.ics.uci.edu/ml/datasets/Bag+of+Words) for details of the Enron files)_
+
+```{r mic-data-prep}
+datapath = "./"
+filename = "docword.enron.txt"
+enrondata <- read.table(paste0(datapath, filename), skip=3)
+names(enrondata) <- c('docID', 'wordID', 'count')
+
+filename = "vocab.enron.txt"
+enronvocab <- read.table(paste0(datapath, filename))
+names(enronvocab) = c('wordtext')
+nWordsInVocabAllEmail = length(enronvocab$wordtext)
+
+# 209 docIDs of interest. Will search for relationships in this set of 209 emails.
+filename = "doc.list.csv"
+enrondoclist <- read.csv(paste0(datapath, filename))
+names(enrondoclist) <- c('n', 'docID')
+emailSubsetDocIDs <- enrondoclist$docID
+nEmailsInSubset = length(emailSubsetDocIDs)
+
+# Sanity checks
+stopifnot(nWordsInVocabAllEmail == 28102)
+stopifnot(nEmailsInSubset == 209)
+
+
+# For the 209 emails of interest, get the count of occurrences of words
+wcInEmailSubset = enrondata[enrondata$docID %in% emailSubsetDocIDs,]
+# Ignore multiple occurrences in a single document (that's the third column).
+# Focus on how many different emails each word occurred.
+# For each word, get the count of docs in the 209 that include the word at least once.
+# Add zero elements at end (e.g. if subset doesn't have "zycher") by specifying
+# the number of bins equal to the number of vocabulary words in all emails.
+docCntsByWord <- data.table(nDocsWithWord=tabulate(wcInEmailSubset$wordID, 
+                                                   nbins=nWordsInVocabAllEmail))
+nWordsInVocabEmailSubset = nrow(docCntsByWord)
+stopifnot(nWordsInVocabEmailSubset == nWordsInVocabAllEmail)
+
+# Add the word text as a column in the data table.
+docCntsByWord$wordtext = as.character(levels(enronvocab$wordtext))
+str(docCntsByWord)
+```
 
 * _What are the top 10 words that describe the topic common to these emails? _
+
+```{r}
+docCntsSorted <-docCntsByWord[order(nDocsWithWord, decreasing=TRUE),]
+top10words <- head(docCntsSorted$wordtext, 10)
+top10words
+```
 * _What is the topic that these emails share? Examine some of the top ranked words and give a short description of the topic that ties the 209 emails together._
+
+Fantasy football league.
+
+A sampling of reinforcing words found in the top 40: player, injury, sunday, games, knee, sunday_game, nfl, league, coach.
+
+Even five non-obvious keywords in the Top 100, all starting with 'coords', ended up being related to fantasy football: coords{0,166, 249, 332, 83}. Googling 'coords166' yielded a [link to CBS SportsLine.com Fantasy Football email](http://www.enron-mail.com/email/kuykendall-t/inbox/Commissioner_COM_E_Reports_for_Big_E_01_12_23_01_2.html). It turns out to be a stripped reference in an HTML entry ('\<AREA coords="166, 1, 249, 25">').
+
+Sportsline.com is owned by CBS, yet "cbs" is not even a vocabulary word. This omission can be explained by historical context. The Enron emails date to 2001, before CBS acquired SportsLine.com in December 2004 (Reference: [Wikipedia, search for "CBS Purchase"](https://en.wikipedia.org/wiki/CBSSports.com))
