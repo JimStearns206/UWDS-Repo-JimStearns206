@@ -37,6 +37,30 @@ mds<- read.csv("MobileCarrierHolidayAnalysis2013.csv")
 
 ```
 
+Exploration
+
+It's interesting that all of the dealers with the highest sales also have a high percentage of first CDR usage:
+
+```{r}
+plot(mds$Sales, as.numeric(mds$PctFirstCDR))
+```
+
+Has the dataset been sorted by some key? Reason for asking: variations in mean to to first activity are clustered around 2/3rds of a day, but the variance starts to increase with Dealer 200 and really spreads out above the 225th dealer:
+
+```{r}
+plot(mds$MeanTimeToFirstActivity)
+```
+
+I was expecting the mean account balance for new customers to increase with the percentage of first CDR usage, but it doesn't:
+
+```{r}
+plot(mds$MeanAcctBalance, mds$PctFirstCDR)
+```
+
+Here's a 1:1 comparison of all the variables:
+```{r}
+plot(mds)
+```
 # Maximal (or Mutual) Information Coefficient (MIC) and Enron Emails
 
 _A subset of the Enron emails (209 of 39,861) have been selected because they are associated with a particular topic. The ID numbers of the emails are contained in doc.list.csv. Use mutual information to identify the words most strongly associated with the emails listed in doc.list.csv (i.e., if each word is a feature, rank them based on mutual information)._ 
@@ -65,7 +89,7 @@ enronvocab <- read.table(paste0(datapath, filename))
 names(enronvocab) = c('wordtext')
 nWordsInVocabAllEmail = length(enronvocab$wordtext)
 
-# 209 docIDs of interest. Will search for relationships in this set of 209 emails.
+# 209 docIDs of interest. 
 filename = "doc.list.csv"
 enrondoclist <- read.csv(paste0(datapath, filename))
 names(enrondoclist) <- c('n', 'docID')
@@ -79,6 +103,68 @@ stopifnot(nEmailsInSubset == 209)
 
 # For the 209 emails of interest, get the count of occurrences of words
 wcInEmailSubset = enrondata[enrondata$docID %in% emailSubsetDocIDs,]
+wcInRestOfEmail = enrondata[! enrondata$docID %in% emailSubsetDocIDs,]
+```
+## Using MIC To Find Words Most Associated with Subset of Email
+
+Compute MIC for each vocabulary word, where the 2x2 contingency table is defined as follows:
+
+____ | Word Present | Word Absent
+---- | ----------- | --------------
+EmailSubSet (ESS) | nESS_present | nESS_absent
+Rest Of Email (RoE)  | nRoE_present  | nRoE_absent
+
+```{r}
+# Ignore multiple occurrences in a single document (that's the third column).
+# Focus on how many different emails each word occurred.
+#
+# Get word counts in the subset of 209 emails, and in the rest of the emails.
+#
+# Add zero elements at end (e.g. if subset doesn't have "zycher") by specifying
+# the number of bins equal to the number of vocabulary words in all emails.
+essWithWord <- data.table(nEmailsWithWord=tabulate(wcInEmailSubset$wordID, 
+                                                   nbins=nWordsInVocabAllEmail))
+roeWithWord <- data.table(nEmailsWithWord=tabulate(wcInRestOfEmail$wordID,
+                                                   nbins=nWordsInVocabAllEmail))
+nWordsInVocabESS = nrow(essWithWord)
+nWordsInVocabRoE = nrow(roeWithWord)
+stopifnot(nWordsInVocabESS == nWordsInVocabAllEmail)
+stopifnot(nWordsInVocabRoE == nWordsInVocabAllEmail)
+
+calculateMIC <- function(wordIdx, wordCntsESS, wordCntsROE) {
+    essT <- wordCntsESS$nEmailsWithWord[wordIdx]
+    essF <- nrow(wordCntsESS) - essT
+    roeT <- wordCntsROE$nEmailsWithWord[wordIdx]
+    roeF <- nrow(wordCntsROE) - roeT
+    ctmic <- matrix(c(essT, essF, roeT, roeF), nrow=2, byrow=TRUE)
+    if (essT > 0 || roeT > 0) {
+        wordIdx
+        ctmic
+    }
+    mi.plugin(ctmic)
+}
+
+wordMics = data.table()
+
+for (i in 1:nWordsInVocabAllEmail) {
+    mic <- calculateMIC(i, essWithWord, roeWithWord)
+    wordtext = as.character(levels(enronvocab$wordtext)[i])
+    wordMics = rbind(wordMics, as.list(c(wordtext, mic)), use.names=FALSE)
+}
+names(wordMics) = c("word", "mic")
+
+wordMics$mic = as.numeric(wordMics$mic)
+wordMicsSorted <- wordMics[order(wordMics$mic, decreasing=TRUE),]
+head(wordMicsSorted, 20)
+```
+The top words aren't very distinctive: "meeting", "attached", "market", etc.
+
+Clearly, I'm not using MIC correctly. So I'll take another tack.
+
+## Counting Occurrences in Subset of Email Without Reference to Balance of Emails
+
+```{r}
+# Focus on the 209 emails in the subset.
 # Ignore multiple occurrences in a single document (that's the third column).
 # Focus on how many different emails each word occurred.
 # For each word, get the count of docs in the 209 that include the word at least once.
@@ -110,3 +196,4 @@ A sampling of reinforcing words found in the top 40: player, injury, sunday, gam
 Even five non-obvious keywords in the Top 100, all starting with 'coords', ended up being related to fantasy football: coords{0,166, 249, 332, 83}. Googling 'coords166' yielded a [link to CBS SportsLine.com Fantasy Football email](http://www.enron-mail.com/email/kuykendall-t/inbox/Commissioner_COM_E_Reports_for_Big_E_01_12_23_01_2.html). It turns out to be a stripped reference in an HTML entry ('\<AREA coords="166, 1, 249, 25">').
 
 Sportsline.com is owned by CBS, yet "cbs" is not even a vocabulary word. This omission can be explained by historical context. The Enron emails date to 2001, before CBS acquired SportsLine.com in December 2004 (Reference: [Wikipedia, search for "CBS Purchase"](https://en.wikipedia.org/wiki/CBSSports.com))
+
