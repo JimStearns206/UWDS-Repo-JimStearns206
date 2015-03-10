@@ -517,7 +517,7 @@ for(i in 1:total) {
   
 }
 
-# correct picks in the NCAA tournement based on RPI
+# correct picks in the NCAA tournament based on RPI
 print("RPI")
 print(correct)
 print(total)
@@ -528,6 +528,7 @@ print(correct/total)
 # Use scaled values for both LRMC and RPI.
 
 corr = c()
+ratioCorrect = c()
 
 minRPI = min(as.numeric(teams$RPI))
 maxRPI = max(as.numeric(teams$RPI))
@@ -535,6 +536,9 @@ rngRPI = maxRPI = minRPI
 minLRMC = min(as.numeric(teams$LRMC.score))
 maxLRMC = max(as.numeric(teams$LRMC.score))
 rngLRMC = maxLRMC - minLRMC
+
+bestAlpha = 0
+bestAlphaRatio = 0
 
 for(alpha in seq(0,1,0.02)) {
 
@@ -578,14 +582,25 @@ for(alpha in seq(0,1,0.02)) {
     
   }
   
-  # correct picks in the NCAA tournement based on RPI
+  # correct picks in the NCAA tournament based on RPI and LRMC
   print("LRMC & RPI")
   print(alpha)
   print(correct)
   print(total)
-  print(correct/total)
+  thisAlphaRatio = correct / total
+  print(thisAlphaRatio)
   
   corr = c(corr, correct)
+  ratioCorrect = c(ratioCorrect, thisAlphaRatio)
+  
+  if (thisAlphaRatio > bestAlphaRatio) {
+      bestAlphaRatio = thisAlphaRatio
+      bestAlpha = alpha
+  }
 }
 
-plot(seq(0,1,0.02), corr)
+plot(seq(0,1,0.02), ratioCorrect, main="NCAA Predictions: RPI*alpha + LRMC*(1-alpha)", 
+     xlab="alpha", ylab="Ratio of Correctly Predicted Results")
+
+print(sprintf("Best prediction ratio of %0.3f achieved with alpha=%s (alpha*RPI + (1-alpha)*LRMC)", 
+              bestAlphaRatio, bestAlpha))
