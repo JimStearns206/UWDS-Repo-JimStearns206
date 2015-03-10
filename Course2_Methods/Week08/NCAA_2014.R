@@ -525,13 +525,23 @@ print(correct/total)
 
 # for each matchup in the NCAA Tournament, compute the number of
 # times the weighted average of LRMC and RPI predicted the winner.
+# Use scaled values for both LRMC and RPI.
 
 corr = c()
 
+minRPI = min(as.numeric(teams$RPI))
+maxRPI = max(as.numeric(teams$RPI))
+rngRPI = maxRPI = minRPI
+minLRMC = min(as.numeric(teams$LRMC.score))
+maxLRMC = max(as.numeric(teams$LRMC.score))
+rngLRMC = maxLRMC - minLRMC
+
 for(alpha in seq(0,1,0.02)) {
 
-  zRPI  = max(as.numeric(teams$RPI))
-  zLRMC = max(teams$LRMC.score)
+  # If used (uncommented), move above loop. Values are loop-invariant.
+  #zRPI  = max(as.numeric(teams$RPI))
+  #zLRMC = max(teams$LRMC.score)
+  
   correct <- 0
   total <- length(ncaa.team1)
   for(i in 1:total) {
@@ -541,9 +551,17 @@ for(alpha in seq(0,1,0.02)) {
     score2RPI  = as.numeric(as.character(teams$RPI[teams$url.name == ncaa.team2[i]]))
     score2LRMC = teams$LRMC.score[teams$url.name == ncaa.team2[i]]
     
-    score1 <- alpha * score1RPI/zRPI + (1.0-alpha) * score1LRMC/zLRMC
-    score2 <- alpha * score2RPI/zRPI + (1.0-alpha) * score2LRMC/zLRMC
-        
+    score1RPIscaled = (score1RPI - minRPI) / rngRPI
+    score1LRMCscaled = (score1LRMC - minLRMC) / rngLRMC
+    score2RPIscaled = (score2RPI - minRPI) / rngRPI
+    score2LRMCscaled = (score2LRMC - minLRMC) / rngLRMC
+    
+    #score1 <- alpha * score1RPI/zRPI + (1.0-alpha) * score1LRMC/zLRMC
+    #score2 <- alpha * score2RPI/zRPI + (1.0-alpha) * score2LRMC/zLRMC
+    
+    score1 <- alpha * score1RPIscaled + (1.0-alpha) * score1LRMCscaled
+    score2 <- alpha * score2RPIscaled + (1.0-alpha) * score2LRMCscaled
+    
     symbol <- "X"
     
     if(ncaa.winner[i] == 1 & score1 > score2) {
