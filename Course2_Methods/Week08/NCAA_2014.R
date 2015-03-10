@@ -332,7 +332,6 @@ for(teams.idx in 1:n) {
     }
     
     team2 <- outcomes$Opponent[games.idx]
-    #team2.name <- gsub(" ", "-", tolower(as.character(team2)))
     team2.name <- transformName2(team2)
     if(team2.name == "") {
       team2.name <- gsub(" ", "-", tolower(as.character(team2)))
@@ -342,7 +341,7 @@ for(teams.idx in 1:n) {
     opponent.index <- which(teams$url.name == team2.name)
 
     if(outcomes$Type[games.idx] == "NCAA") {
-      # if it's a tournamet game, record the outcome
+      # if it's a tournament game, record the outcome
       if(length(opponent.index) > 0) {
         if(team.index < opponent.index) {
           ncaa.team1 <- c(ncaa.team1, as.character(teams$url.name[teams.idx]))
@@ -359,8 +358,7 @@ for(teams.idx in 1:n) {
       # exclude the game from the rankings calculation
       next
     }
-    
-    
+     
     if(length(opponent.index) > 0) {
 
       # don't double count...
@@ -489,114 +487,115 @@ print(correct)
 print(total)
 print(correct/total)
 
-# for each matchup in the NCAA Tournament, compute the number of
-# times the widely used RPI model predicted the winner.
-correct <- 0
-total <- length(ncaa.team1)
-for(i in 1:total) {
-  
-  score1 <- teams$RPI[teams$url.name == ncaa.team1[i]]
-  score2 <- teams$RPI[teams$url.name == ncaa.team2[i]]
-  
-  score1 <- as.numeric(as.character(score1))
-  score2 <- as.numeric(as.character(score2))
-  
-  symbol <- "X"
-  
-  if(ncaa.winner[i] == 1 & score1 > score2) {
-    correct <- correct + 1
-    symbol <- "*"
-  }
-  
-  if(ncaa.winner[i] == 2 & score2 > score1) {
-    correct <- correct + 1
-    symbol <- "*"
-  }
-  
-  print(paste(symbol,paste(paste(ncaa.team1[i],"vs."),ncaa.team2[i])))
-  
+calculateRpiPredictions = function(teams, ncaa.team1, ncaa.team2, ncaa.winner) {
+    
+    # for each matchup in the NCAA Tournament, compute the number of
+    # times the widely used RPI model predicted the winner.
+    correct <- 0
+    total <- length(ncaa.team1)
+    for(i in 1:total) {
+        
+        score1 <- teams$RPI[teams$url.name == ncaa.team1[i]]
+        score2 <- teams$RPI[teams$url.name == ncaa.team2[i]]
+        
+        score1 <- as.numeric(as.character(score1))
+        score2 <- as.numeric(as.character(score2))
+        
+        symbol <- "X"
+        
+        if(ncaa.winner[i] == 1 & score1 > score2) {
+            correct <- correct + 1
+            symbol <- "*"
+        }
+        
+        if(ncaa.winner[i] == 2 & score2 > score1) {
+            correct <- correct + 1
+            symbol <- "*"
+        }
+        
+        print(paste(symbol,paste(paste(ncaa.team1[i],"vs."),ncaa.team2[i])))
+        
+    }
+    returnList = list(correct=correct,total=total)
 }
 
-# correct picks in the NCAA tournament based on RPI
-print("RPI")
-print(correct)
-print(total)
-print(correct/total)
+rpiPredictions = calculateRpiPredictions(teams, ncaa.team1, ncaa.team2, ncaa.winner)
+print("RPI Prediction Results")
+print(rpiPredictions$correct)
+print(rpiPredictions$total)
+print(rpiPredictions$correct / rpiPredictions$total)
+
+calculateWeightedRpiLrmcPredictions = function(teams, ncaa.team1, ncaa.team2, ncaa.winner, alpha) {
+    minRPI = min(as.numeric(teams$RPI))
+    maxRPI = max(as.numeric(teams$RPI))
+    rngRPI = maxRPI = minRPI
+    minLRMC = min(as.numeric(teams$LRMC.score))
+    maxLRMC = max(as.numeric(teams$LRMC.score))
+    rngLRMC = maxLRMC - minLRMC
+    
+    correct <- 0
+    total <- length(ncaa.team1)
+    for(i in 1:total) {
+        
+        score1RPI  = as.numeric(as.character(teams$RPI[teams$url.name == ncaa.team1[i]]))
+        score1LRMC = teams$LRMC.score[teams$url.name == ncaa.team1[i]]
+        score2RPI  = as.numeric(as.character(teams$RPI[teams$url.name == ncaa.team2[i]]))
+        score2LRMC = teams$LRMC.score[teams$url.name == ncaa.team2[i]]
+        
+        score1RPIscaled = (score1RPI - minRPI) / rngRPI
+        score1LRMCscaled = (score1LRMC - minLRMC) / rngLRMC
+        score2RPIscaled = (score2RPI - minRPI) / rngRPI
+        score2LRMCscaled = (score2LRMC - minLRMC) / rngLRMC
+        
+        score1 <- alpha * score1RPIscaled + (1.0-alpha) * score1LRMCscaled
+        score2 <- alpha * score2RPIscaled + (1.0-alpha) * score2LRMCscaled
+        
+        symbol <- "X"
+        
+        if(ncaa.winner[i] == 1 & score1 > score2) {
+            correct <- correct + 1
+            symbol <- "*"
+        }
+        
+        if(ncaa.winner[i] == 2 & score2 > score1) {
+            correct <- correct + 1
+            symbol <- "*"
+        }
+        
+        #(Debug)#print(paste(symbol,paste(paste(ncaa.team1[i],"vs."),ncaa.team2[i])))    
+    }
+    returnList = list(correct=correct,total=total)
+    return(returnList)
+}
 
 # for each matchup in the NCAA Tournament, compute the number of
 # times the weighted average of LRMC and RPI predicted the winner.
 # Use scaled values for both LRMC and RPI.
 
-corr = c()
 ratioCorrect = c()
-
-minRPI = min(as.numeric(teams$RPI))
-maxRPI = max(as.numeric(teams$RPI))
-rngRPI = maxRPI = minRPI
-minLRMC = min(as.numeric(teams$LRMC.score))
-maxLRMC = max(as.numeric(teams$LRMC.score))
-rngLRMC = maxLRMC - minLRMC
-
 bestAlpha = 0
 bestAlphaRatio = 0
 
 for(alpha in seq(0,1,0.02)) {
 
-  # If used (uncommented), move above loop. Values are loop-invariant.
-  #zRPI  = max(as.numeric(teams$RPI))
-  #zLRMC = max(teams$LRMC.score)
-  
-  correct <- 0
-  total <- length(ncaa.team1)
-  for(i in 1:total) {
+    weightedRpiLrmcPredictions = calculateWeightedRpiLrmcPredictions(teams, ncaa.team1, ncaa.team2, ncaa.winner, alpha)
+    correct <- weightedRpiLrmcPredictions$correct
+    total <- weightedRpiLrmcPredictions$total
     
-    score1RPI  = as.numeric(as.character(teams$RPI[teams$url.name == ncaa.team1[i]]))
-    score1LRMC = teams$LRMC.score[teams$url.name == ncaa.team1[i]]
-    score2RPI  = as.numeric(as.character(teams$RPI[teams$url.name == ncaa.team2[i]]))
-    score2LRMC = teams$LRMC.score[teams$url.name == ncaa.team2[i]]
+    # correct picks in the NCAA tournament based on RPI and LRMC
+    print("LRMC & RPI")
+    print(alpha)
+    print(correct)
+    print(total)
+    thisAlphaRatio = correct / total
+    print(thisAlphaRatio)
     
-    score1RPIscaled = (score1RPI - minRPI) / rngRPI
-    score1LRMCscaled = (score1LRMC - minLRMC) / rngLRMC
-    score2RPIscaled = (score2RPI - minRPI) / rngRPI
-    score2LRMCscaled = (score2LRMC - minLRMC) / rngLRMC
+    ratioCorrect = c(ratioCorrect, thisAlphaRatio)
     
-    #score1 <- alpha * score1RPI/zRPI + (1.0-alpha) * score1LRMC/zLRMC
-    #score2 <- alpha * score2RPI/zRPI + (1.0-alpha) * score2LRMC/zLRMC
-    
-    score1 <- alpha * score1RPIscaled + (1.0-alpha) * score1LRMCscaled
-    score2 <- alpha * score2RPIscaled + (1.0-alpha) * score2LRMCscaled
-    
-    symbol <- "X"
-    
-    if(ncaa.winner[i] == 1 & score1 > score2) {
-      correct <- correct + 1
-      symbol <- "*"
-    }
-    
-    if(ncaa.winner[i] == 2 & score2 > score1) {
-      correct <- correct + 1
-      symbol <- "*"
-    }
-    
-    #(Debug)#print(paste(symbol,paste(paste(ncaa.team1[i],"vs."),ncaa.team2[i])))
-    
-  }
-  
-  # correct picks in the NCAA tournament based on RPI and LRMC
-  print("LRMC & RPI")
-  print(alpha)
-  print(correct)
-  print(total)
-  thisAlphaRatio = correct / total
-  print(thisAlphaRatio)
-  
-  corr = c(corr, correct)
-  ratioCorrect = c(ratioCorrect, thisAlphaRatio)
-  
-  if (thisAlphaRatio > bestAlphaRatio) {
+    if (thisAlphaRatio > bestAlphaRatio) {
       bestAlphaRatio = thisAlphaRatio
       bestAlpha = alpha
-  }
+    }
 }
 
 plot(seq(0,1,0.02), ratioCorrect, main="NCAA Predictions: RPI*alpha + LRMC*(1-alpha)", 
