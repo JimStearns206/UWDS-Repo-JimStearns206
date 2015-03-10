@@ -19,41 +19,42 @@ pnorm(a*x-b)
 library(XML)
 
 # Set up teams list: include top 200 by RPI
+teamColumnNames = c("Rk.", "School", "W", "L", "RPI", "SOS Rank", "SOS") 
 
 # Get top 68 teams
 url <- "http://www.cbssports.com/collegebasketball/rankings/rpi/index1"
-tables <- readHTMLTable(url)
+tables_top68 <- readHTMLTable(url)
 
 # get teams 1-34
-teams <- tables[[4]]
+teams1 <- tables_top68[[4]]
 #names(teams) <- sapply(teams[1,], as.character)
 #teams <- teams[-1,]
-names(teams) = c("Rk.", "School", "W", "L", "RPI", "SOS Rank", "SOS") 
+names(teams1) = teamColumnNames 
 
 # get teams 35-68
-teams2 <- tables[[5]]
+teams2 <- tables_top68[[5]]
 #names(teams2) <- sapply(teams2[1,], as.character)
 #teams2 <- teams2[-1,]
-names(teams2) = c("Rk.", "School", "W", "L", "RPI", "SOS Rank", "SOS") 
+names(teams2) = teamColumnNames 
 
 # Get remaining teams
 url <- "http://www.cbssports.com/collegebasketball/rankings/rpi/index2"
-tables <- readHTMLTable(url)
+tables_remaining <- readHTMLTable(url)
 
 # skip first row for formatting reasons
-teams3 <- tables[[4]]
+teams3 <- tables_remaining[[4]]
 #names(teams3) <- sapply(teams3[1,], as.character)
 #teams3 <- teams3[2:nrow(teams3),]
 
-names(teams3) = c("Rk.", "School", "W", "L", "RPI", "SOS Rank", "SOS") 
+names(teams3) = teamColumnNames 
 
-teams4 <- tables[[5]]
+teams4 <- tables_remaining[[5]]
 #names(teams4) <- sapply(teams4[1,], as.character)
 #teams4 <- teams4[2:nrow(teams4),]
 
-names(teams4) = c("Rk.", "School", "W", "L", "RPI", "SOS Rank", "SOS") 
+names(teams4) = teamColumnNames 
 
-teams <- rbind(teams, teams2, teams3, teams4)
+teams <- rbind(teams1, teams2, teams3, teams4)
 
 # Grand Canyon university joind D1 in 2014, so remove it for 2013 testing
 id = which(teams$School == "Grand Canyon")
@@ -71,7 +72,9 @@ teams$School[id]
 #teams = teams[-id,]
 
 # remove extra copies of the header row from the table
-teams = teams[-which(teams$School=="School"),]
+if (length(which(teams$School == "School"))) {
+    teams = teams[-which(teams$School=="School"),]
+}
 
 # regularize team names
 # all lower case
@@ -119,8 +122,12 @@ transformName1 <- function(name) {
     "Prairie View A&M","prairie-view",
     "NC-Greensboro","north-carolina-greensboro",
     "The Citadel","citadel",  
-    "UMass-Lowell", "massachusetts-lowell",
-    "UT Martin", "tennessee-martin"
+    "UMass Lowell", "massachusetts-lowell",
+    "UT Martin", "tennessee-martin",
+    "NC State", "north-carolina-state",
+    "UC Davis", "california-davis",
+    "UC Irvine", "california-irvine",
+    "UL Lafayette", "louisiana-lafayette"
   )
   
   n <- length(pairs)
@@ -191,6 +198,7 @@ for(i in 1:n) {
   name <- teams$School[i]
   url.name <- transformName1(name)
   if(url.name != "") {
+    print(sprintf("TransformName1: URL name from '%s' to '%s'", teams$url.name[i], url.name))
     teams$url.name[i] <- url.name
   }
 }
@@ -198,49 +206,72 @@ for(i in 1:n) {
 t <- matrix(0,n,n)
 teams$ngames <- array(0, n)
 
+print("==== verify URLs: Start ====")
+# test code for verifying urls
+# loop through all teams on the teams list
+bad.teams <- c()
+bad.home <- c()
+for(teams.idx in 1:n){
+  
+  # read in team game results
+  team1.name <- teams$url.name[teams.idx]
+  url <- paste("http://www.sports-reference.com/cbb/schools/",team1.name, sep="")
+  url <- paste(url, "/2014-schedule.html", sep="")
+  game_result_tables <- readHTMLTable(url)
+  
+  outcomes <- game_result_tables[[length(game_result_tables)]]
+  if(ncol(outcomes) != 13) {
+    print(sprintf("Verify URL: error for team '%s' (url name='%s'): ncols=%s", 
+                  teams$School[teams.idx], team1.name, ncol(outcomes)))
+    teams[teams.idx,]
+    #next
+    #break
+    stop
+  }
+  
+  for(games.idx in 1:nrow(outcomes)) {
 
-## test code for verifying urls
-## loop through all teams on the teams list
-#bad.teams <- c()
-#bad.home <- c()
-#for(teams.idx in 1:n) {
-#  
-#  # read in team game results
-#  team1.name <- teams$url.name[teams.idx]
-#  url <- paste("http://www.sports-reference.com/cbb/schools/",team1.name, sep="")
-#  url <- paste(url, "/2013-schedule.html", sep="")
-#  tables <- readHTMLTable(url)
-#  
-#  outcomes <- tables[[length(tables)]]
-#  if(ncol(outcomes) != 13) {
-#    print("error")
-#    break
-#  }
-#  
-#  for(games.idx in 1:nrow(outcomes)) {
-#
-#    # skip non D1 games
-#    if(outcomes$Conf[games.idx] == "") {
-#      next
-#    }
-#    
-#    team2 <- outcomes$Opponent[games.idx]
-#    
-#    team2.name <- transformName2(team2)
-#    if(team2.name == "") {
-#      team2.name <- gsub(" ", "-", tolower(as.character(team2)))
-#    }  
-#    
-#    team.index <- which(teams$url.name == team1.name)
-#    opponent.index <- which(teams$url.name == team2.name)
-#    if(length(opponent.index) == 0) {
-#      bad.teams <- c(bad.teams, as.character(team2))
-#      bad.home <- c(bad.home, as.character(team1.name))
-#    }
-#  }
-#}
-#
-#unique(bad.teams)
+    # Skip header rows in the form:
+    # "32 G Date Type  Opponent Conf                                      Tm Opp OT W L Streak"
+    if (outcomes$Opponent[games.idx] == "Opponent") {
+        next
+    }
+    
+    # skip non D1 games
+    if(outcomes$Conf[games.idx] == "") {
+      next
+    }
+
+    team2 <- outcomes$Opponent[games.idx]
+    
+    team2.name <- transformName2(team2)
+    if(team2.name == "") {
+      team2.name <- gsub(" ", "-", tolower(as.character(team2)))
+    }  
+    
+    team.index <- which(teams$url.name == team1.name)
+    if (length(team.index) != 1) {
+        print(sprintf("Unexpected # matches = %s for team1 '%s'", length(team.index), team1.name))
+        stop
+    }
+    opponent.index <- which(teams$url.name == team2.name)
+    if(length(opponent.index) == 0) {
+      bad.teams <- c(bad.teams, as.character(team2))
+      bad.home <- c(bad.home, as.character(team1.name))
+      ##
+      outcomes[games.idx,]
+    }
+    if (length(opponent.index) > 1) {
+        print(sprintf("Unexpected # matches = %s for opponent '%s'",
+                      length(opponent.index), team2.name))
+        stop
+    }
+  }
+}
+unique(bad.home)
+unique(bad.teams)
+
+print("==== verify URLs: End ====")
 
 ncaa.team1  <- c()
 ncaa.team2  <- c()
@@ -255,11 +286,16 @@ for(teams.idx in 1:n) {
   url <- paste(url, "/2014-schedule.html", sep="")
   tables <- readHTMLTable(url)
   
+  if (length(tables) == 0) {
+      print(sprintf("Couldn't find game results for %s", team1.name))
+      next
+  }
+  
   print(c(teams.idx, team1.name))
   
   outcomes <- tables[[length(tables)]]
-  if(ncol(outcomes) != 15) {
-    print("error")
+  if(ncol(outcomes) != 13) {
+    print(sprintf("Error in game result lookup for team idx/name = %i/%s", teams.idx, team1.name))
     break
   }
   outcomes$Tm <- as.numeric(as.character(outcomes$Tm))
@@ -283,7 +319,13 @@ for(teams.idx in 1:n) {
   # update as if team1 = home and team2 = away
   
   for(games.idx in 1:nrow(outcomes)) {
-    
+      
+    # Skip header rows in the form:
+    # "32 G Date Type  Opponent Conf                                      Tm Opp OT W L Streak"
+    if (outcomes$Opponent[games.idx] == "Opponent") {
+     next
+    }
+      
     # skip non D1 games
     if(outcomes$Conf[games.idx] == "") {
       next
@@ -376,7 +418,7 @@ for(teams.idx in 1:n) {
       t[i,i] <- t[i,i] + r
       t[j,j] <- t[j,j] + (1-r)
       
-      #print(paste(paste(paste(team.home,"vs."), team.away),paste(spread,r)))
+      print(paste(paste(paste(team.home,"vs."), team.away),paste(spread,r)))
   
       } 
   }
@@ -414,7 +456,7 @@ teams <- teams[order(teams$LRMC.score, decreasing=TRUE),]
 
 teams.alpha <- teams[order(teams$School, decreasing=FALSE),]
 
-# for each matchup in the NCAA Tournement, compute the number of
+# for each matchup in the NCAA Tournament, compute the number of
 # times the LRMC model predicted the winner.
 correct <- 0
 total <- length(ncaa.team1)
@@ -447,7 +489,7 @@ print(correct)
 print(total)
 print(correct/total)
 
-# for each matchup in the NCAA Tournement, compute the number of
+# for each matchup in the NCAA Tournament, compute the number of
 # times the widely used RPI model predicted the winner.
 correct <- 0
 total <- length(ncaa.team1)
@@ -481,7 +523,7 @@ print(correct)
 print(total)
 print(correct/total)
 
-# for each matchup in the NCAA Tournement, compute the number of
+# for each matchup in the NCAA Tournament, compute the number of
 # times the weighted average of LRMC and RPI predicted the winner.
 
 corr = c()
@@ -514,16 +556,16 @@ for(alpha in seq(0,1,0.02)) {
       symbol <- "*"
     }
     
-    #print(paste(symbol,paste(paste(ncaa.team1[i],"vs."),ncaa.team2[i])))
+    print(paste(symbol,paste(paste(ncaa.team1[i],"vs."),ncaa.team2[i])))
     
   }
   
   # correct picks in the NCAA tournement based on RPI
-  #print("LRMC & RPI")
-  #print(alpha)
-  #print(correct)
-  #print(total)
-  #print(correct/total)
+  print("LRMC & RPI")
+  print(alpha)
+  print(correct)
+  print(total)
+  print(correct/total)
   
   corr = c(corr, correct)
 }
