@@ -483,7 +483,7 @@ for(i in 1:total) {
 
 #########  Wait until the regular season is final!
 
-# correct picks in the NCAA tournement based on RPI
+# correct picks in the NCAA tournement based on LRMC
 print("LRMC")
 print(correct)
 print(total)
@@ -556,7 +556,7 @@ for(alpha in seq(0,1,0.02)) {
       symbol <- "*"
     }
     
-    print(paste(symbol,paste(paste(ncaa.team1[i],"vs."),ncaa.team2[i])))
+    #(Debug)#print(paste(symbol,paste(paste(ncaa.team1[i],"vs."),ncaa.team2[i])))
     
   }
   
