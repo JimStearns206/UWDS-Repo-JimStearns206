@@ -1,19 +1,14 @@
 # http://www.sports-reference.com/cbb/
 
-# set some constants
+# Constants used in determining whether result beat the point spread.
+h <- 4  # Used in games at a neutral court to adjust spread as if team1 played at home.
 tau <- 4.26
 sig <- 11 
-h   <- 4
 
 # code to compute the probability that one team is better than another based on point spread, x.
 # compute P(Z>0 | X=x) from eq. (12) pnorm(2*tau^2/(sig*sqrt((sig^2+2*tau^2)*(sig^2+4*tau^2)))*x - h/sig*sqrt((sig^2+4*tau^2)/(sig^2+2*tau^2))) 
 a <- 2*tau^2/(sig*sqrt((sig^2+2*tau^2)*(sig^2+4*tau^2)))
 b <- 2*tau^2*h/(sig*sqrt((sig^2+2*tau^2)*(sig^2+4*tau^2)))
-
-x <- 20
-pnorm(a*x-b)
-
-###################
 
 # include XML package to read data from HTML tables
 library(XML)
@@ -198,7 +193,7 @@ for(i in 1:n) {
   name <- teams$School[i]
   url.name <- transformName1(name)
   if(url.name != "") {
-    print(sprintf("TransformName1: URL name from '%s' to '%s'", teams$url.name[i], url.name))
+    #print(sprintf("TransformName1: URL name from '%s' to '%s'", teams$url.name[i], url.name))
     teams$url.name[i] <- url.name
   }
 }
@@ -245,6 +240,10 @@ for(teams.idx in 1:n){
     team2 <- outcomes$Opponent[games.idx]
     
     team2.name <- transformName2(team2)
+    # Kludge fix to get rid of warnings. But there should only be one team2.name.
+    if (length(team2.name) > 1) {
+        team2.name = team2.name[1]
+    }
     if(team2.name == "") {
       team2.name <- gsub(" ", "-", tolower(as.character(team2)))
     }  
@@ -259,7 +258,7 @@ for(teams.idx in 1:n){
       bad.teams <- c(bad.teams, as.character(team2))
       bad.home <- c(bad.home, as.character(team1.name))
       ##
-      outcomes[games.idx,]
+      ##outcomes[games.idx,]
     }
     if (length(opponent.index) > 1) {
         print(sprintf("Unexpected # matches = %s for opponent '%s'",
@@ -291,7 +290,7 @@ for(teams.idx in 1:n) {
       next
   }
   
-  print(c(teams.idx, team1.name))
+  ##print(c(teams.idx, team1.name))
   
   outcomes <- tables[[length(tables)]]
   if(ncol(outcomes) != 13) {
@@ -416,7 +415,7 @@ for(teams.idx in 1:n) {
       t[i,i] <- t[i,i] + r
       t[j,j] <- t[j,j] + (1-r)
       
-      print(paste(paste(paste(team.home,"vs."), team.away),paste(spread,r)))
+      ##print(paste(paste(paste(team.home,"vs."), team.away),paste(spread,r)))
   
       } 
   }
@@ -482,10 +481,11 @@ for(i in 1:total) {
 #########  Wait until the regular season is final!
 
 # correct picks in the NCAA tournement based on LRMC
+lmrcPredictions = list(correct=correct, total=total)
 print("LRMC")
-print(correct)
-print(total)
-print(correct/total)
+print(lmrcPredictions$correct)
+print(lmrcPredictions$total)
+print(lmrcPredictions$correct/lmrcPredictions$total)
 
 calculateRpiPredictions = function(teams, ncaa.team1, ncaa.team2, ncaa.winner) {
     
