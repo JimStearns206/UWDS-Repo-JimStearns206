@@ -1,0 +1,166 @@
+---
+title: "UWDS2-Wk1-Weather-jms206"
+author: "Jim Stearns, NetID=jms206"
+date: " 13 January 2015"
+output: 
+    pdf_document:
+        latex_engine: xelatex
+geometry: margin=0.5in
+fontsize: 12pt
+mainfont: Verdana
+monofont: Consolas
+---
+
+# Weather Data
+
+## Assignment Overview
+
+"The atmospheric science department at UW has been collecting weather data from a station set up on their rooftop (in Seattle) since 1998. The station records time, temperature, humidity, and similar measurements once every minute. Let’s explore this dataset in order to become familiar with the data, sanity check to verify data quality, and finally look for some simple relationship and trends. Use the same data set we used in class (weather_data_2000_2014.csv). If you need to download the dataset again, a download link is available on the Catalyst site."
+
+## Dataset Acquisition and Preparation
+
+The [course "Catalyst" web page]() contains a [link for the 2000-2014 data on a dropbox location](https://www.dropbox.com/s/5wot0sbhcsy6x99/weather_data_2000_2014.csv.zip?dl=0)
+
+The dataset is about 60MB, so be patient, and download only if it isn't already available on this system.
+
+```{r}
+# Adjust for your environment.
+homeDir <- "/Users/jimstearns/GoogleDrive/Learning/Courses/UWPCE-DataScience/UWDS-Repo-JimStearns206/Course2_Methods/Week01"
+
+stopifnot(file.exists(homeDir))
+setwd(homeDir)
+
+# Sorry, but this URL seems transitory, and it's a dropbox that doesn't support programmatic download
+# ... But for now (Jan 2015), it works, manually
+#urlToWeatherData <- "https://www.dropbox.com/s/5wot0sbhcsy6x99/weather_data_2000_2014.csv.zip?dl=1"
+#if (!file.exists(pathToWeatherData)) {
+#    download.file(urlToWeatherData, pathToWeatherData, method="curl")
+#}
+```
+```{r, cache=TRUE}
+# Save some time by unzipping externally. R takes forever.
+# read.csv can unzip, but it took forever, approaching a hang.
+# So unzipped outside read.csv, and use here.
+pathToWeatherData <- "weather_data_2000_2014.csv"
+stopifnot(file.exists(pathToWeatherData))
+if (!exists("wd_df")) {
+    wd_df <- read.csv(pathToWeatherData, header=TRUE)
+}
+```
+```{r}
+library(data.table)
+wd <- data.table(wd_df)
+
+#Header:
+#Year,Month,Day,Time,RHum (%),Temp (F),Wind Direct,Speed (knot),Gust (knot),Rain (inch),Radiation (Watts m-2),Pres(mbar)
+wd_names=c('Year', 'Month', 'Day', 'Time', 'RHumPct', 'TempF', 'WindDir', 'WindSpeed', 'WindGust','RainInches','RadiationWattsM2','PresMbar')
+names(wd) <- wd_names
+```
+## Data Exploration and Quality Issue(s)
+### Assignment
+a.    "Using summary statistics, histograms, boxplots, or other means identify and describe at least one data quality issue in the dataset."
+
+### Implementation
+
+```{r}
+str(wd)
+head(wd)
+summary(wd)
+```
+
+Summary() is sufficient to identify eight fields with one or more data quality issues:
+
+1. Relative Humidity, Percent (RHumPct): Values below 0 and greater than 100.
+2. Temperature, Farenheit (TempF): A minimum value of -99999 and maximum value of 9596.
+3. Wind direction (WindDir): Values above 360.
+4. Wind Speed in Knots (WindSpeed): a maximum value of 9526.
+5. Wind Gust in Knots (WindGust): a maximum value of 952290.
+6. Rain in Inches (RainInches): even for Seattle, a maximum value of 1833 inches has never occurred.
+7. Radiation in watts/meter^2 (RadiationWattsM2): a maximum value of 26177.
+8. Pressure in millibars: over 5M Not-Availables (NA's)
+
+How many outliers in a dataset with `r nrow(wd)` observations:
+
+1. `r length(wd$RHumPct[wd$RHumPct < 0 | wd$RHumPct > 100])` = Relative Humidity, Percent (RHumPct): Values below 0 and greater than 100: 
+2. `r length(wd$TempF[wd$TempF < -40 | wd$TempF > 130])` = Temperature, Farenheit (TempF): Temperature < -40 or > 130.
+3. `r length(wd$WindDir[wd$WindDir > 360])` = Wind direction (WindDir): Values above 360.
+4. `r length(wd$WindSpeed[wd$WindSpeed > 200])` = Wind Speed in Knots (WindSpeed): values above 200.
+5. `r length(wd$WindGust[wd$WindGust > 300])` = Wind Gust in Knots (WindGust): values above 300.
+6. `r length(wd$RainInches[wd$RainInches > 10])` = Rain in Inches (RainInches) > 10: even for Seattle, a maximum value of 1833 inches has never occurred in a 10 minute period. 
+7. `r length(wd$RadiationWattsM2[wd$RadiationWattsM2 > 1000])` = Radiation in watts/meter^2 (RadiationWattsM2): a  value greater than 1000.
+8. `r length(wd$PresMbar[is.na(wd$PresMbar)])` = Pressure in millibars: entries with value of NA.
+
+## Filtering Questionable Data
+### Assignment
+b.	"Filter the data to remove the questionable data you identified in part a. How much of the data is affected? Hint: some of the functions “length”, “nrow”, “ncol”, “is.na”, and “which” may be helpful."
+
+### Implementation
+
+For the purpose of looking for and analyzing monthly trends, I put Pressure to the side: most of that column's entries are NA - over 5M out of less than 7M. 
+```{r}
+wdF <- wd[, PresMbar:=NULL]
+```
+Remove every row with an out-of-bounds value in any of the remaining columns.
+```{r}
+nRowBeforeFiltering <- nrow(wdF)
+wdF <- wdF[!(wdF$RHumPct < 0 | wdF$RHumPct > 100),]
+nrow(wdF)
+wdF <- wdF[!(wdF$TempF < -40 | wdF$TempF > 130),]
+nrow(wdF)
+wdF <- wdF[!(wdF$WindDir > 360),]
+nrow(wdF)
+wdF <- wdF[!(wdF$WindSpeed > 200),]
+nrow(wdF)
+wdF <- wdF[!(wdF$WindGust > 300),]
+nrow(wdF)
+wdF <- wdF[!(wdF$RainInches > 10),]
+nrow(wdF)
+wdF <- wdF[!(wdF$RadiationWattsM2 > 1000),]
+nrow(wdF)
+nRowAfterFiltering <- nrow(wdF)
+```
+`r nRowBeforeFiltering - nRowAfterFiltering` out of `r nRowBeforeFiltering` unfiltered rows were removed.
+
+## Monthly Trend
+
+### Assignment
+c.	"Look for and describe a monthly trend in the data."
+
+Assumption: we're looking for trends over months in every year, not over years. I.e. aggregate each month for all years.
+
+### Implementation
+
+```{r}
+# Skip (don't average) columns: Year, Day, Time
+columnsToAggregate=c(wdF$RHumPct, wdF$TempF, wdF$WindDir, wdF$windGust, wdF$RainInches)
+wdSumByMon <- aggregate(cbind(RHumPct, TempF, WindDir, WindSpeed, WindGust, RainInches) ~ Month, data=wdF, FUN=mean)
+```
+Plots of each of the six metrics of interest, by month:
+```{r}
+library("ggplot2")
+xAxisLabels <- c("Jan","Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+ggplot(wdSumByMon, aes(x=Month)) + scale_x_continuous(breaks=seq(1,12), labels=xAxisLabels) + 
+    geom_line(aes(y=RHumPct))
+ggplot(wdSumByMon, aes(x=Month)) + scale_x_continuous(breaks=seq(1,12), labels=xAxisLabels) + 
+    geom_line(aes(y=TempF))
+ggplot(wdSumByMon, aes(x=Month)) + scale_x_continuous(breaks=seq(1,12), labels=xAxisLabels) + 
+    geom_line(aes(y=WindDir))
+ggplot(wdSumByMon, aes(x=Month)) + scale_x_continuous(breaks=seq(1,12), labels=xAxisLabels) + 
+    geom_line(aes(y=WindSpeed))
+ggplot(wdSumByMon, aes(x=Month)) + scale_x_continuous(breaks=seq(1,12), labels=xAxisLabels) + 
+    geom_line(aes(y=WindGust))
+ggplot(wdSumByMon, aes(x=Month)) + scale_x_continuous(breaks=seq(1,12), labels=xAxisLabels) + 
+    geom_line(aes(y=RainInches))
+```
+
+Monthly trends observed in the above plot:
+
+* Obvious (for Seattle):
+    * Warmest in August, coolest in December/January
+    * Driest in the summer, wettest in November/December
+    * Least humid in summer, most humid in winter
+    * Lightest winds, both steady and gust, in September. Strongest in March.
+* Less Obvious:
+    * The average wind direction, all seasons is mostly from the south - between 150 and 200 degrees.
+    * The wind direction tends to the SSW in the summer and to the SSE in the winter.
+    
